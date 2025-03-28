@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ земельных участков</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 400px; }
+        .land-card {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+        }
+        .search-box {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary mb-4">
+        <div class="container">
+            <span class="navbar-brand">Анализ земельных участков</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="search-box">
+            <div class="row">
+                <div class="col-md-8">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Введите регион для поиска">
+                </div>
+                <div class="col-md-4">
+                    <button onclick="searchLands()" class="btn btn-primary w-100">Поиск</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div id="map"></div>
+            </div>
+            <div class="col-md-4">
+                <div id="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        const map = L.map('map').setView([55.751244, 37.618423], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let markers = [];
+
+        // Получение всех участков
+        async function getAllLands() {
+            try {
+                const response = await fetch('/api/lands');
+                if (!response.ok) throw new Error('Ошибка получения данных');
+                const lands = await response.json();
+                displayResults(lands);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Поиск участков
+        async function searchLands() {
+            const region = document.getElementById('searchInput').value;
+            if (!region) {
+                getAllLands();
+                return;
+            }
+            try {
+                const response = await fetch(`/api/lands/search?region=${encodeURIComponent(region)}`);
+                if (!response.ok) throw new Error('Ошибка поиска');
+                const lands = await response.json();
+                displayResults(lands);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Отображение результатов
+        function displayResults(lands) {
+            // Очистка старых маркеров
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            // Отображение результатов
+            const resultHtml = lands.map(land => {
+                // Добавление маркера
+                const coordinates = JSON.parse(land.coordinates);
+                const marker = L.marker(coordinates)
+                    .bindPopup(`
+                        <strong>${land.type}</strong><br>
+                        Площадь: ${land.area} соток
+                    `)
+                    .addTo(map);
+                markers.push(marker);
+
+                // Карточка участка
+                return `
+                    <div class="land-card">
+                        <h5>${land.type}</h5>
+                        <p><strong>Регион:</strong> ${land.region}</p>
+                        <p><strong>Площадь:</strong> ${land.area} соток</p>
+                        <p><strong>Статус:</strong> ${land.status}</p>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('result').innerHTML = 
+                `<div class="alert alert-success">Найдено участков: ${lands.length}</div>${resultHtml}`;
+        }
+
+        // Отображение ошибок
+        function showError(message) {
+            document.getElementById('result').innerHTML = 
+                `<div class="alert alert-danger">Ошибка: ${message}</div>`;
+        }
+
+        // Загрузка данных при старте
+        getAllLands();
+
+        // Обработка Enter в поле поиска
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchLands();
+            }
+        });
+    </script>
+</body>
+</html> 

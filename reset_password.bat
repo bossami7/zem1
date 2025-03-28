@@ -1,0 +1,3 @@
+@echo off
+echo Changing PostgreSQL password...
+runas /user:Administrator "\"C:\Program Files\PostgreSQL\17\bin\psql\" -U postgres -c \"ALTER USER postgres WITH PASSWORD 'postgres123';\"" 

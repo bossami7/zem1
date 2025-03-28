@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест API</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .land-item { 
+            border: 1px solid #ddd; 
+            margin: 10px 0; 
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        button { 
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        #map {
+            height: 400px;
+            margin: 20px 0;
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+    <h1>Тестирование API земельных участков</h1>
+    
+    <div>
+        <button onclick="getAllLands()">Получить все участки</button>
+        <button onclick="searchLands('Moskovskaya')">Поиск по Московской области</button>
+        <input type="text" id="searchInput" placeholder="Введите регион">
+        <button onclick="searchLands(document.getElementById('searchInput').value)">Поиск</button>
+    </div>
+
+    <div id="map"></div>
+    <div id="result"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        const map = L.map('map').setView([55.751244, 37.618423], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let markers = [];
+
+        // Получение всех участков
+        async function getAllLands() {
+            try {
+                const response = await fetch('/api/lands');
+                const lands = await response.json();
+                displayResults(lands);
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Поиск участков
+        async function searchLands(region) {
+            try {
+                const response = await fetch(`/api/lands/search?region=${encodeURIComponent(region)}`);
+                const lands = await response.json();
+                displayResults(lands);
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Отображение результатов
+        function displayResults(lands) {
+            // Очистка старых маркеров
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            // Отображение результатов
+            const resultHtml = lands.map(land => {
+                // Добавление маркера на карту
+                const coordinates = JSON.parse(land.coordinates);
+                const marker = L.marker(coordinates)
+                    .bindPopup(`${land.type}<br>Площадь: ${land.area} соток`)
+                    .addTo(map);
+                markers.push(marker);
+
+                // Возвращаем HTML для списка
+                return `
+                    <div class="land-item">
+                        <strong>Регион:</strong> ${land.region}<br>
+                        <strong>Тип:</strong> ${land.type}<br>
+                        <strong>Площадь:</strong> ${land.area} соток<br>
+                        <strong>Координаты:</strong> ${land.coordinates}<br>
+                        <strong>Статус:</strong> ${land.status}
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('result').innerHTML = 
+                `<div class="success">Найдено участков: ${lands.length}</div>` + resultHtml;
+        }
+
+        // Загрузка всех участков при старте
+        getAllLands();
+    </script>
+</body>
+</html> 
